@@ -51,11 +51,12 @@ exports.handler = async function(event, context) {
       };
     }
   } catch (error) {
-    console.error('Error en la función de autenticación:', error);
+    console.error('Error en la función de autenticación:', error); // Log detallado del error
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ success: false, message: 'Error en el servidor' }),
+      body: JSON.stringify({ success: false, message: 'Error en el servidor', error: error.message }),
     };
   }
+  
 };
