@@ -28,9 +28,10 @@ exports.handler = async function(event, context) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
 
+  // Manejo de solicitudes OPTIONS (Preflight)
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -90,7 +91,6 @@ exports.handler = async function(event, context) {
     }
 
     if (method === 'DELETE') {
-      // Eliminar un autor
       const { id } = JSON.parse(event.body);
       const deletedAuthor = await Author.findByIdAndDelete(id);
       if (!deletedAuthor) {
