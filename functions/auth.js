@@ -1,25 +1,61 @@
-const express = require('express');
 const jwt = require('jsonwebtoken');
-const router = express.Router();
 require('dotenv').config();
 
-// Datos de usuario simulados
+// Simulación de datos de usuario
 const mockUser = {
   username: 'usuarioEjemplo',
   password: 'passwordSeguro'
 };
 
-router.post('/login', (req, res) => {
-  const { username, password } = req.body;
+exports.handler = async function(event, context) {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
 
-  // Valida las credenciales
-  if (username === mockUser.username && password === mockUser.password) {
-    // Genera un token JWT
-    const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    return res.json({ success: true, token });
-  } else {
-    return res.status(401).json({ success: false, message: 'Credenciales incorrectas' });
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers,
+      body: 'OK',
+    };
   }
-});
 
-module.exports = router;
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      headers,
+      body: JSON.stringify({ message: 'Método no permitido' }),
+    };
+  }
+
+  try {
+    const { username, password } = JSON.parse(event.body);
+
+    // Valida las credenciales
+    if (username === mockUser.username && password === mockUser.password) {
+      // Genera un token JWT
+      const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ success: true, token }),
+      };
+    } else {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ success: false, message: 'Credenciales incorrectas' }),
+      };
+    }
+  } catch (error) {
+    console.error('Error en la función de autenticación:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, message: 'Error en el servidor' }),
+    };
+  }
+};
