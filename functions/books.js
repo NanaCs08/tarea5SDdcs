@@ -63,7 +63,51 @@ exports.handler = async function(event, context) {
           };
       }
 
-      // Otros métodos como POST, PUT, DELETE permanecen iguales
+      if (method === 'POST') {
+        // Crear un nuevo libro
+        const data = JSON.parse(event.body);
+        const newBook = new Book(data);
+        const savedBook = await newBook.save();
+        
+        // Enviar mensaje a RabbitMQ para operación 'add'
+        await sendToQueue({ action: 'add', entity: 'book', data: savedBook });
+        
+        return {
+          statusCode: 201,
+          headers,
+          body: JSON.stringify(savedBook)
+        };
+    }
+
+      if (method === 'PUT') {
+          // Actualizar un libro existente
+          const { id, ...updateData } = JSON.parse(event.body);
+          const updatedBook = await Book.findOneAndUpdate({ id: id }, updateData, { new: true });
+          
+          // Enviar mensaje a RabbitMQ para operación 'update'
+          await sendToQueue({ action: 'update', entity: 'book', data: updatedBook });
+          
+          return {
+            statusCode: 200,
+            headers,
+            body: JSON.stringify(updatedBook)
+          };
+      }
+
+      if (method === 'DELETE') {
+          // Eliminar un libro
+          const { id } = JSON.parse(event.body);
+          await Book.findOneAndDelete({ id: id });
+          
+          // Enviar mensaje a RabbitMQ para operación 'delete'
+          await sendToQueue({ action: 'delete', entity: 'book', id });
+          
+          return {
+            statusCode: 204,
+            headers,
+            body: JSON.stringify({ message: 'Book eliminado exitosamente' })
+          };
+      }
 
       return {
           statusCode: 405,

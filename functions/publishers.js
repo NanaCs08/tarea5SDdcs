@@ -63,7 +63,51 @@ exports.handler = async function(event, context) {
           };
       }
 
-      // Otros métodos como POST, PUT, DELETE permanecen iguales
+      if (method === 'POST') {
+        // Crear una nueva editorial
+        const data = JSON.parse(event.body);
+        const newPublisher = new Publisher(data);
+        const savedPublisher = await newPublisher.save();
+        
+        // Enviar mensaje a RabbitMQ para operación 'add'
+        await sendToQueue({ action: 'add', entity: 'publisher', data: savedPublisher });
+        
+        return {
+          statusCode: 201,
+          headers,
+          body: JSON.stringify(savedPublisher)
+        };
+      }
+  
+      if (method === 'PUT') {
+        // Actualizar una editorial existente
+        const { id, ...updateData } = JSON.parse(event.body);
+        const updatedPublisher = await Publisher.findByIdAndUpdate(id, updateData, { new: true });
+        
+        // Enviar mensaje a RabbitMQ para operación 'update'
+        await sendToQueue({ action: 'update', entity: 'publisher', data: updatedPublisher });
+        
+        return {
+          statusCode: 200,
+          headers,
+          body: JSON.stringify(updatedPublisher)
+        };
+      }
+  
+      if (method === 'DELETE') {
+        // Eliminar una editorial
+        const { id } = JSON.parse(event.body);
+        await Publisher.findByIdAndDelete(id);
+        
+        // Enviar mensaje a RabbitMQ para operación 'delete'
+        await sendToQueue({ action: 'delete', entity: 'publisher', id });
+        
+        return {
+          statusCode: 204,
+          headers,
+          body: JSON.stringify({ message: 'Publisher eliminado exitosamente' })
+        };
+      }
 
       return {
           statusCode: 405,
