@@ -1,11 +1,11 @@
 const mongoose = require('mongoose');
 const amqp = require('amqplib'); // Para conectar a RabbitMQ
-const Book = require('../models/Book');
+const Publisher = require('../models/Publisher');
 require('dotenv').config();
 
 // Conectar a MongoDB (solo se conecta si aún no está conectado)
 if (mongoose.connection.readyState === 0) {
-    mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+  mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 }
 
 // Función para conectar y enviar mensajes a RabbitMQ
@@ -24,15 +24,19 @@ async function sendToQueue(message) {
   }
 }
 
-exports.handler = async function(event, context) {
-  // Configurar los encabezados de CORS para todas las respuestas
+// Validar el password usando el encabezado
+function checkPassword(headers) {
+  const password = headers['x-password'];
+  return password === process.env.USER_PASSWORD;
+}
+
+exports.handler = async function (event, context) {
   const headers = {
-    'Access-Control-Allow-Origin': '*', // Permitir todos los orígenes
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', // Métodos permitidos
-    'Access-Control-Allow-Headers': 'Content-Type' // Encabezados permitidos
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Password'
   };
 
-  // Manejar las solicitudes OPTIONS preflight para CORS
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -41,64 +45,72 @@ exports.handler = async function(event, context) {
     };
   }
 
+  // Validar el password antes de proceder
+  if (!checkPassword(event.headers)) {
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({ message: 'Password incorrecto' })
+    };
+  }
+
   try {
     const method = event.httpMethod;
 
     if (method === 'GET') {
-        // Obtener todos los libros
-        const books = await Book.find();
-        console.log("Libros recuperados:", books);
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify(books)
-        };
+      // Obtener todas las editoriales
+      const publishers = await Publisher.find();
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(publishers)
+      };
     }
 
     if (method === 'POST') {
-        // Crear un nuevo libro
-        const data = JSON.parse(event.body);
-        const newBook = new Book(data);
-        const savedBook = await newBook.save();
-        
-        // Enviar mensaje a RabbitMQ para operación 'add'
-        await sendToQueue({ action: 'add', entity: 'book', data: savedBook });
-        
-        return {
-          statusCode: 201,
-          headers,
-          body: JSON.stringify(savedBook)
-        };
+      // Crear una nueva editorial
+      const data = JSON.parse(event.body);
+      const newPublisher = new Publisher(data);
+      const savedPublisher = await newPublisher.save();
+
+      // Enviar mensaje a RabbitMQ para operación 'add'
+      await sendToQueue({ action: 'add', entity: 'publisher', data: savedPublisher });
+
+      return {
+        statusCode: 201,
+        headers,
+        body: JSON.stringify(savedPublisher)
+      };
     }
 
     if (method === 'PUT') {
-        // Actualizar un libro existente
-        const { id, ...updateData } = JSON.parse(event.body);
-        const updatedBook = await Book.findOneAndUpdate({ id: id }, updateData, { new: true });
-        
-        // Enviar mensaje a RabbitMQ para operación 'update'
-        await sendToQueue({ action: 'update', entity: 'book', data: updatedBook });
-        
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify(updatedBook)
-        };
+      // Actualizar una editorial existente
+      const { id, ...updateData } = JSON.parse(event.body);
+      const updatedPublisher = await Publisher.findByIdAndUpdate(id, updateData, { new: true });
+
+      // Enviar mensaje a RabbitMQ para operación 'update'
+      await sendToQueue({ action: 'update', entity: 'publisher', data: updatedPublisher });
+
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify(updatedPublisher)
+      };
     }
 
     if (method === 'DELETE') {
-        // Eliminar un libro
-        const { id } = JSON.parse(event.body);
-        await Book.findOneAndDelete({ id: id });
-        
-        // Enviar mensaje a RabbitMQ para operación 'delete'
-        await sendToQueue({ action: 'delete', entity: 'book', id });
-        
-        return {
-          statusCode: 204,
-          headers,
-          body: JSON.stringify({ message: 'Book eliminado exitosamente' })
-        };
+      // Eliminar una editorial
+      const { id } = JSON.parse(event.body);
+      await Publisher.findByIdAndDelete(id);
+
+      // Enviar mensaje a RabbitMQ para operación 'delete'
+      await sendToQueue({ action: 'delete', entity: 'publisher', id });
+
+      return {
+        statusCode: 204,
+        headers,
+        body: JSON.stringify({ message: 'Publisher eliminado exitosamente' })
+      };
     }
 
     return {
